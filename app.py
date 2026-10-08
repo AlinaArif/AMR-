@@ -15,7 +15,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# High-End Biotech Dashboard Styling
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -25,48 +24,45 @@ st.markdown("""
         border-radius: 10px;
         border-left: 5px solid #00d2ff;
     }
-    .metric-card {
-        background-color: #1e222d;
-        padding: 20px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        border: 1px solid #2e3440;
-    }
     .badge-live { background-color: #00c853; color: white; padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 12px; }
-    .badge-high { background-color: #ff5252; color: white; padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 12px; }
     </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. MASTER ORGANISM CONFIGURATION (5 PATHOGENS x 5 ANTIBIOTICS)
+# 2. MASTER ORGANISM CONFIGURATION (EXCEL FILE MAPPING)
 # ---------------------------------------------------------
 ORGANISM_MAP = {
     "Klebsiella pneumoniae": {
         "taxon_id": 573,
+        "file": "AMR_Master_Combined.xlsx",
         "antibiotics": ["Meropenem", "Ceftriaxone", "Ciprofloxacin", "Amikacin", "Colistin"],
         "genes": ["blaKPC-2", "blaNDM-1", "blaOXA-48", "mgrB", "ramR"],
         "mic_units": "mg/L"
     },
     "Escherichia coli": {
         "taxon_id": 562,
+        "file": "Escherichia_coli_AMR_Prediction.xlsx",
         "antibiotics": ["Ciprofloxacin", "Ampicillin", "Ceftriaxone", "Meropenem", "Amikacin"],
         "genes": ["blaCTX-M-15", "gyrA_S83L", "parC_S80I", "blaTEM-1", "aac(6')-Ib-cr"],
         "mic_units": "mg/L"
     },
     "Salmonella enterica": {
         "taxon_id": 28901,
+        "file": "Salmonella_Typhi_AMR_Prediction.xlsx",
         "antibiotics": ["Ampicillin", "Ceftriaxone", "Ciprofloxacin", "Trimethoprim-Sulfamethoxazole", "Azithromycin"],
         "genes": ["qnrS1", "blaCTX-M-55", "gyrA_D87N", "sul2", "mphA"],
         "mic_units": "mg/L"
     },
     "Acinetobacter baumannii": {
         "taxon_id": 470,
+        "file": "Acinetobacter_baumannii_AMR_Prediction.xlsx",
         "antibiotics": ["Imipenem", "Meropenem", "Colistin", "Tigecycline", "Amikacin"],
         "genes": ["blaOXA-23", "blaOXA-24", "lpxC", "armA", "adeB"],
         "mic_units": "mg/L"
     },
     "Mycobacterium tuberculosis": {
         "taxon_id": 1773,
+        "file": "Mycobacterium_tuberculosis_AMR_Prediction.xlsx",
         "antibiotics": ["Isoniazid", "Ethambutol", "Levofloxacin", "Linezolid", "Bedaquiline"],
         "genes": ["katG_S315T", "inhA_promoter", "embB_M306V", "gyrA_D94G", "atpE"],
         "mic_units": "μg/mL"
@@ -74,43 +70,45 @@ ORGANISM_MAP = {
 }
 
 # ---------------------------------------------------------
-# 3. DATA LOADER & GENERATOR
+# 3. AUTOMATIC DATA LOADER (READS .XLSX OR SIMULATES)
 # ---------------------------------------------------------
 @st.cache_data
 def load_organism_data(org_name):
-    clean_slug = org_name.lower().replace(" ", "_")
-    pred_path = f"predictions/{clean_slug}_predictions.csv"
+    file_path = ORGANISM_MAP[org_name]["file"]
     
-    # Check if prediction file exists
-    if os.path.exists(pred_path):
-        df_trends = pd.read_csv(pred_path)
-    else:
-        # Generate rich structured mock data matching predictions
-        np.random.seed(ORGANISM_MAP[org_name]["taxon_id"])
-        years = list(range(1998, 2032))
-        abx_list = ORGANISM_MAP[org_name]["antibiotics"]
-        gene_list = ORGANISM_MAP[org_name]["genes"]
-        
-        rows = []
-        for yr in years:
-            for i, abx in enumerate(abx_list):
-                is_forecast = yr > 2024
-                base_val = 15.0 + (i * 8.0)
-                trend = (yr - 1998) * (1.8 if is_forecast else 1.2)
-                res_rate = min(98.5, max(5.0, round(base_val + trend + np.random.normal(0, 3), 1)))
-                shap_val = round((res_rate / 100) * np.random.uniform(0.65, 0.95), 3)
+    if os.path.exists(file_path):
+        try:
+            return pd.read_excel(file_path)
+        except Exception:
+            try:
+                return pd.read_csv(file_path)
+            except Exception:
+                pass
                 
-                rows.append({
-                    "Year": yr,
-                    "Antibiotic": abx,
-                    "Predicted_Resistance_Pct": res_rate,
-                    "Is_Forecast": is_forecast,
-                    "SHAP_Risk_Score": shap_val,
-                    "High_Risk_Gene": gene_list[i]
-                })
-        df_trends = pd.DataFrame(rows)
-        
-    return df_trends
+    # Fallback simulation if file loading encounters structure differences
+    np.random.seed(ORGANISM_MAP[org_name]["taxon_id"])
+    years = list(range(1998, 2032))
+    abx_list = ORGANISM_MAP[org_name]["antibiotics"]
+    gene_list = ORGANISM_MAP[org_name]["genes"]
+    
+    rows = []
+    for yr in years:
+        for i, abx in enumerate(abx_list):
+            is_forecast = yr > 2024
+            base_val = 15.0 + (i * 8.0)
+            trend = (yr - 1998) * (1.8 if is_forecast else 1.2)
+            res_rate = min(98.5, max(5.0, round(base_val + trend + np.random.normal(0, 3), 1)))
+            shap_val = round((res_rate / 100) * np.random.uniform(0.65, 0.95), 3)
+            
+            rows.append({
+                "Year": yr,
+                "Antibiotic": abx,
+                "Predicted_Resistance_Pct": res_rate,
+                "Is_Forecast": is_forecast,
+                "SHAP_Risk_Score": shap_val,
+                "High_Risk_Gene": gene_list[i]
+            })
+    return pd.DataFrame(rows)
 
 # ---------------------------------------------------------
 # 4. SIDEBAR CONTROLS
@@ -132,7 +130,6 @@ org_info = ORGANISM_MAP[selected_organism]
 taxon_id = org_info["taxon_id"]
 available_abx = org_info["antibiotics"]
 
-# Live API Status Widget in Sidebar
 st.sidebar.markdown("""
     <div style='background-color: #1e222d; padding: 10px; border-radius: 8px; border-left: 4px solid #00c853;'>
         <small style='color: #8b949e;'>BV-BRC Live API Status</small><br>
@@ -150,24 +147,23 @@ selected_abx = st.sidebar.multiselect(
 target_horizon = st.sidebar.slider("Target Forecast Horizon:", 2025, 2031, 2031)
 critical_cutoff = st.sidebar.slider("Critical Resistance Cutoff (%):", 50, 95, 75)
 
-# Load Selected Organism Data
 df_all = load_organism_data(selected_organism)
-df_filtered = df_all[(df_all["Antibiotic"].isin(selected_abx)) & (df_all["Year"] <= target_horizon)]
+
+if "Antibiotic" in df_all.columns and "Year" in df_all.columns:
+    df_filtered = df_all[(df_all["Antibiotic"].isin(selected_abx)) & (df_all["Year"] <= target_horizon)]
+else:
+    df_filtered = df_all
 
 # ---------------------------------------------------------
-# 5. HEADER & TOP METRIC CARDS
+# 5. HEADER & TOP METRICS
 # ---------------------------------------------------------
 st.title(f"🧬 {selected_organism} AMR Genomic & AI Surveillance Platform")
-st.caption(f"Integrative Multi-Omics Analysis: Longitudinal Phenotypic Trends (1998–2024), ML Trajectory Forecasting (2025–2031), & Genomic Driver Discovery | **NCBI Taxon ID: {taxon_id}**")
+st.caption(f"Integrative Multi-Omics Analysis | **NCBI Taxon ID: {taxon_id}**")
 
-st.markdown("<br>", unsafe_allow_html=True)
-
-# 5 Top Metric Cards
 m1, m2, m3, m4, m5 = st.columns(5)
-
-df_horizon = df_filtered[df_filtered["Year"] == target_horizon]
-peak_res_val = df_horizon["Predicted_Resistance_Pct"].max() if not df_horizon.empty else 0.0
-peak_abx = df_horizon.sort_values(by="Predicted_Resistance_Pct", ascending=False).iloc[0]["Antibiotic"] if not df_horizon.empty else "N/A"
+df_horizon = df_filtered[df_filtered["Year"] == target_horizon] if "Year" in df_filtered.columns else pd.DataFrame()
+peak_res_val = df_horizon["Predicted_Resistance_Pct"].max() if not df_horizon.empty and "Predicted_Resistance_Pct" in df_horizon.columns else 0.0
+peak_abx = df_horizon.sort_values(by="Predicted_Resistance_Pct", ascending=False).iloc[0]["Antibiotic"] if not df_horizon.empty and "Predicted_Resistance_Pct" in df_horizon.columns else "N/A"
 
 m1.metric("Genomic Isolates", "1,250", "↑ 100% Sequenced")
 m2.metric("Resistance Genes", f"{len(org_info['genes'])} Markers", "↑ High Impact")
@@ -178,7 +174,7 @@ m5.metric("BV-BRC Live Sync", "Active", f"Taxon {taxon_id}")
 st.markdown("---")
 
 # ---------------------------------------------------------
-# 6. FIVE (5) FULL ANALYSIS TABS
+# 6. FIVE (5) ANALYSIS TABS
 # ---------------------------------------------------------
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📈 Longitudinal & Trajectory Analysis",
@@ -188,37 +184,33 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📁 Data Explorer & Export"
 ])
 
-# ---------------------------------------------------------
-# TAB 1: LONGITUDINAL & TRAJECTORY ANALYSIS
-# ---------------------------------------------------------
 with tab1:
     st.subheader(f"📊 Resistance Trends (1998–2024) & AI Forecast Trajectory (2025–{target_horizon})")
-    
     col_t1, col_t2 = st.columns([3, 1])
-    
     with col_t1:
-        fig_trend = px.line(
-            df_filtered,
-            x="Year",
-            y="Predicted_Resistance_Pct",
-            color="Antibiotic",
-            line_dash="Is_Forecast",
-            markers=True,
-            title=f"Longitudinal Resistance Probability Trajectory for {selected_organism}",
-            labels={"Predicted_Resistance_Pct": "Resistance Rate (%)"}
-        )
-        fig_trend.add_vline(x=2024.5, line_width=2, line_dash="dash", line_color="#ff5252", annotation_text="Forecast Horizon (2025+)")
-        fig_trend.add_hline(y=critical_cutoff, line_width=1.5, line_dash="dot", line_color="#ffa726", annotation_text="Critical Threat Limit")
-        fig_trend.update_layout(template="plotly_dark", height=450)
-        st.plotly_chart(fig_trend, use_container_width=True)
+        if "Year" in df_filtered.columns and "Predicted_Resistance_Pct" in df_filtered.columns:
+            fig_trend = px.line(
+                df_filtered,
+                x="Year",
+                y="Predicted_Resistance_Pct",
+                color="Antibiotic" if "Antibiotic" in df_filtered.columns else None,
+                line_dash="Is_Forecast" if "Is_Forecast" in df_filtered.columns else None,
+                markers=True,
+                title=f"Longitudinal Resistance Probability Trajectory for {selected_organism}",
+                labels={"Predicted_Resistance_Pct": "Resistance Rate (%)"}
+            )
+            fig_trend.add_vline(x=2024.5, line_width=2, line_dash="dash", line_color="#ff5252", annotation_text="Forecast Horizon (2025+)")
+            fig_trend.add_hline(y=critical_cutoff, line_width=1.5, line_dash="dot", line_color="#ffa726", annotation_text="Critical Threat Limit")
+            fig_trend.update_layout(template="plotly_dark", height=450)
+            st.plotly_chart(fig_trend, use_container_width=True)
 
     with col_t2:
         st.subheader(f"Year {target_horizon} Breakdown")
-        if not df_horizon.empty:
+        if not df_horizon.empty and "Predicted_Resistance_Pct" in df_horizon.columns:
             fig_bar = px.bar(
                 df_horizon,
                 x="Predicted_Resistance_Pct",
-                y="Antibiotic",
+                y="Antibiotic" if "Antibiotic" in df_horizon.columns else None,
                 color="Predicted_Resistance_Pct",
                 orientation="h",
                 color_continuous_scale="Reds",
@@ -227,22 +219,15 @@ with tab1:
             fig_bar.update_layout(template="plotly_dark", height=450, showlegend=False)
             st.plotly_chart(fig_bar, use_container_width=True)
 
-# ---------------------------------------------------------
-# TAB 2: GENOMIC ARCHITECTURE & RESISTOME
-# ---------------------------------------------------------
 with tab2:
     st.subheader(f"🧬 Resistome Architecture & Primary Gene Drivers ({selected_organism})")
-    st.write("Prevalence and impact distribution of key resistance genes detected in sequenced isolates.")
-    
     col_g1, col_g2 = st.columns(2)
-    
     gene_df = pd.DataFrame({
         "Gene Marker": org_info["genes"],
         "Isolate Frequency (%)": [88.4, 76.2, 64.1, 42.8, 31.5],
         "Plasmid Mediated": [True, True, False, True, False],
         "Primary Resistance Spectrum": org_info["antibiotics"]
     })
-    
     with col_g1:
         fig_gene = px.bar(
             gene_df,
@@ -255,22 +240,14 @@ with tab2:
         )
         fig_gene.update_layout(template="plotly_dark", height=380)
         st.plotly_chart(fig_gene, use_container_width=True)
-        
     with col_g2:
         st.markdown("### 🔬 High-Risk Allele Profiles")
         st.dataframe(gene_df, use_container_width=True)
-        st.info("💡 **Genomic Insight:** Plasmid-mediated resistance markers show a higher transmission velocity across regional hospital isolates.")
 
-# ---------------------------------------------------------
-# TAB 3: AI / SHAP RISK DRIVERS
-# ---------------------------------------------------------
 with tab3:
     st.subheader("🧠 SHAP Feature Importance & Genomic Risk Drivers")
-    st.write("Explaining AI model predictions: Which genomic mutations contribute most heavily to treatment failure?")
-    
-    df_shap_curr = df_filtered[df_filtered["Year"] == 2026].copy()
-    
-    if not df_shap_curr.empty:
+    df_shap_curr = df_filtered[df_filtered["Year"] == 2026].copy() if "Year" in df_filtered.columns else pd.DataFrame()
+    if not df_shap_curr.empty and "SHAP_Risk_Score" in df_shap_curr.columns:
         fig_shap = px.scatter(
             df_shap_curr,
             x="SHAP_Risk_Score",
@@ -284,17 +261,8 @@ with tab3:
         fig_shap.update_layout(template="plotly_dark", height=420)
         st.plotly_chart(fig_shap, use_container_width=True)
 
-        st.markdown("### Top Predictive Drivers Summary")
-        for idx, row in df_shap_curr.iterrows():
-            st.markdown(f"* **{row['Antibiotic']}**: Key driver mutation **{row['High_Risk_Gene']}** with a SHAP impact score of **{row['SHAP_Risk_Score']}**.")
-
-# ---------------------------------------------------------
-# TAB 4: PHENOTYPIC MIC PROFILING
-# ---------------------------------------------------------
 with tab4:
-    st.subheader(f"🔬 Phenotypic MIC (Minimum Inhibitory Concentration) Distribution")
-    st.write(f"Distribution of MIC values measured in {org_info['mic_units']} across tested clinical isolates.")
-    
+    st.subheader(f"🔬 Phenotypic MIC Distribution")
     mic_data = []
     np.random.seed(123)
     for abx in available_abx:
@@ -305,7 +273,6 @@ with tab4:
                 "Category": np.random.choice(["Susceptible", "Intermediate", "Resistant"], p=[0.4, 0.15, 0.45])
             })
     df_mic = pd.DataFrame(mic_data)
-    
     fig_mic = px.box(
         df_mic[df_mic["Antibiotic"].isin(selected_abx)],
         x="Antibiotic",
@@ -318,17 +285,13 @@ with tab4:
     fig_mic.update_layout(template="plotly_dark", height=450)
     st.plotly_chart(fig_mic, use_container_width=True)
 
-# ---------------------------------------------------------
-# TAB 5: DATA EXPLORER & EXPORT
-# ---------------------------------------------------------
 with tab5:
     st.subheader(f"📁 Raw Data Explorer & Export ({selected_organism})")
     st.dataframe(df_filtered, use_container_width=True)
-    
     csv_bytes = df_filtered.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label=f"📥 Download {selected_organism} Prediction CSV",
+        label=f"📥 Download {selected_organism} Data CSV",
         data=csv_bytes,
-        file_name=f"{selected_organism.lower().replace(' ', '_')}_predictions.csv",
+        file_name=f"{selected_organism.lower().replace(' ', '_')}_data.csv",
         mime="text/csv"
     )
