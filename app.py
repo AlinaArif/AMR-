@@ -77,7 +77,6 @@ ORGANISM_MAP = {
 # ---------------------------------------------------------
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_bvbrc_live_data(taxon_id):
-    """Fetches real live genome counts and sync verification from BV-BRC RAST API"""
     url = f"https://www.bv-brc.org/api/genome/?eq(taxon_id,{taxon_id})&limit(1)"
     headers = {"Accept": "application/json"}
     try:
@@ -130,11 +129,9 @@ st.sidebar.title("PathoCast AI")
 
 st.sidebar.markdown("---")
 
-# Feature 2: Global Organism Search Bar
 st.sidebar.subheader("🔍 Global Search & Filter")
 search_query = st.sidebar.text_input("Search Organism or Taxon ID:", placeholder="e.g. 562 or E. coli")
 
-# Filtering matched organism
 matched_org = None
 if search_query.strip():
     q = search_query.lower().strip()
@@ -153,7 +150,6 @@ org_info = ORGANISM_MAP[selected_organism]
 taxon_id = org_info["taxon_id"]
 available_abx = org_info["antibiotics"]
 
-# Feature 3: Live Real BV-BRC Connection Status
 bvbrc_data = fetch_bvbrc_live_data(taxon_id)
 status_badge = "badge-live" if bvbrc_data["status"] == "CONNECTED" else "badge-alert"
 
@@ -192,7 +188,6 @@ m5.metric("BV-BRC Endpoint", "Active 200 OK", f"Response {bvbrc_data['latency']}
 
 st.markdown("---")
 
-# Feature 1 Alert: High Resistance Deprecation Warning Banner
 if not deprecated_genes.empty:
     st.markdown(f"""
         <div class='critical-card'>
@@ -208,7 +203,7 @@ if not deprecated_genes.empty:
     """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 7. ANALYSIS TABS WITH GENE PREDICTION TRAJECTORY
+# 7. ANALYSIS TABS
 # ---------------------------------------------------------
 tab1, tab2, tab3, tab4 = st.tabs([
     "🧬 Gene Resistance Trajectory (2025–2031)",
@@ -217,8 +212,10 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "📁 Data Explorer"
 ])
 
-# Feature 1 Tab: Gene Resistance Trajectory
-# Enhanced Trajectory Chart with Clear 2025-2031 Prediction Shading
+with tab1:
+    st.subheader(f"🧬 Gene Marker Resistance Growth & Target Deprecation (1998–{target_horizon})")
+    st.write("Track predicted resistance percentage for individual genetic drivers to stop working on 100% resistant markers.")
+    
     fig_gene_traj = px.line(
         df_gene_trends[df_gene_trends["Year"] <= target_horizon],
         x="Year",
@@ -230,7 +227,6 @@ tab1, tab2, tab3, tab4 = st.tabs([
         labels={"Gene_Resistance_Pct": "Population Resistance (%)"}
     )
     
-    # Highlight 2025-2031 Forecast Zone with background rectangle
     fig_gene_traj.add_vrect(
         x0=2024.5, x1=target_horizon,
         fillcolor="rgba(255, 82, 82, 0.12)",
@@ -242,9 +238,12 @@ tab1, tab2, tab3, tab4 = st.tabs([
     fig_gene_traj.add_hline(y=90.0, line_width=2, line_dash="dot", line_color="#d50000", annotation_text="Deprecation Threshold (90%)")
     fig_gene_traj.update_layout(template="plotly_dark", height=480)
     st.plotly_chart(fig_gene_traj, use_container_width=True)
+    
+    st.markdown(f"### 📋 Gene Resistance Profile for Year {target_horizon}")
+    st.dataframe(df_gene_2031[["Gene_Marker", "Associated_Antibiotic", "Gene_Resistance_Pct", "Critical_Status"]], use_container_width=True)
+
 with tab2:
     st.subheader("📈 Antibiotic Resistance Trends & AI Forecasting")
-    # Antibiotic line plot
     fig_abx = px.line(
         df_gene_trends[df_gene_trends["Year"] <= target_horizon],
         x="Year",
@@ -256,7 +255,6 @@ with tab2:
     fig_abx.update_layout(template="plotly_dark", height=420)
     st.plotly_chart(fig_abx, use_container_width=True)
 
-# Feature 3 Tab: BV-BRC Live Query Proof
 with tab3:
     st.subheader("🌐 BV-BRC (PATRIC) Live API Authentication & Data Sync")
     st.write("Direct JSON response from the official BV-BRC genome query endpoint verifying live data integrity:")
