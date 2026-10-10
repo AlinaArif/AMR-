@@ -242,7 +242,6 @@ tab1, tab2, tab3, tab4 = st.tabs([
     fig_gene_traj.add_hline(y=90.0, line_width=2, line_dash="dot", line_color="#d50000", annotation_text="Deprecation Threshold (90%)")
     fig_gene_traj.update_layout(template="plotly_dark", height=480)
     st.plotly_chart(fig_gene_traj, use_container_width=True)
-
 with tab2:
     st.subheader("📈 Antibiotic Resistance Trends & AI Forecasting")
     # Antibiotic line plot
