@@ -218,10 +218,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 # Feature 1 Tab: Gene Resistance Trajectory
-with tab1:
-    st.subheader(f"🧬 Gene Marker Resistance Growth & Target Deprecation (1998–{target_horizon})")
-    st.write("Track predicted resistance percentage for individual genetic drivers to stop working on 100% resistant markers.")
-    
+# Enhanced Trajectory Chart with Clear 2025-2031 Prediction Shading
     fig_gene_traj = px.line(
         df_gene_trends[df_gene_trends["Year"] <= target_horizon],
         x="Year",
@@ -232,13 +229,19 @@ with tab1:
         title=f"Predicted Resistance Trajectory per Gene Marker ({selected_organism})",
         labels={"Gene_Resistance_Pct": "Population Resistance (%)"}
     )
-    fig_gene_traj.add_hline(y=90.0, line_width=2, line_dash="dot", line_color="#d50000", annotation_text="Deprecation Threshold (90%)")
-    fig_gene_traj.add_vline(x=2024.5, line_width=1.5, line_dash="dash", line_color="#ffb74d", annotation_text="Forecast Horizon (2025+)")
-    fig_gene_traj.update_layout(template="plotly_dark", height=460)
-    st.plotly_chart(fig_gene_traj, use_container_width=True)
     
-    st.markdown(f"### 📋 Gene Resistance Profile for Year {target_horizon}")
-    st.dataframe(df_gene_2031[["Gene_Marker", "Associated_Antibiotic", "Gene_Resistance_Pct", "Critical_Status"]], use_container_width=True)
+    # Highlight 2025-2031 Forecast Zone with background rectangle
+    fig_gene_traj.add_vrect(
+        x0=2024.5, x1=target_horizon,
+        fillcolor="rgba(255, 82, 82, 0.12)",
+        layer="below", line_width=0,
+        annotation_text="AI PREDICTION ZONE (2025–2031)",
+        annotation_position="top left"
+    )
+    
+    fig_gene_traj.add_hline(y=90.0, line_width=2, line_dash="dot", line_color="#d50000", annotation_text="Deprecation Threshold (90%)")
+    fig_gene_traj.update_layout(template="plotly_dark", height=480)
+    st.plotly_chart(fig_gene_traj, use_container_width=True)
 
 with tab2:
     st.subheader("📈 Antibiotic Resistance Trends & AI Forecasting")
